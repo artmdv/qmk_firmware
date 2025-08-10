@@ -2,7 +2,7 @@
   "name": "Dactyl Manuform (5x6_3)",
   "vendorId": "0x6172",
   "productId": "0x6461",
-  "matrix": {"rows": 12, "cols": 6},
+  "matrix": {"rows": 12, "cols": 5},
   "layouts": {
     "keymap": [
   [
