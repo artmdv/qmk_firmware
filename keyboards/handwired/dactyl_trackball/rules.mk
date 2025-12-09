@@ -1,0 +1,23 @@
+MCU          = RP2040
+BOOTLOADER   = rp2040
+
+# Enable OLED (Defaults to SSD1306 automatically)
+OLED_ENABLE  = yes
+OLED_DRIVER = ssd1306
+
+# Standard options
+
+
+POINTING_DEVICE_ENABLE = yes
+POINTING_DEVICE_DRIVER = pmw3360
+SPLIT_POINTING_ENABLE = yes
+SPLIT_COMMON_ENABLE = yes
+SPLIT_KEYBOARD = yes
+
+SERIAL_DRIVER = vendor
+
+VIA_ENABLE = yes
+
+NKRO_ENABLE = yes
+
+EXTRAKEY_ENABLE = yes
