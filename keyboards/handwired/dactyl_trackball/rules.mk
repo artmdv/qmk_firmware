@@ -17,6 +17,8 @@ SPLIT_KEYBOARD = yes
 SERIAL_DRIVER = vendor
 
 VIA_ENABLE = yes
+VIAL_ENABLE = yes 
+LTO_ENABLE = yes
 
 NKRO_ENABLE = yes
 
