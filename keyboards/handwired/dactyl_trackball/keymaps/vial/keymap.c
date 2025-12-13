@@ -1,10 +1,21 @@
 #include QMK_KEYBOARD_H
 #include <stdio.h>
+#include "pointing_device.h"
 
 enum layers {
     _BASE,
     _LOWER
 };
+
+#define KEY_DRAG_SCROLL 0x7E00
+#define KEY_DPI_UP      0x7E01
+#define KEY_DPI_DOWN    0x7E02
+#define KEY_SNIPING     0x7E03
+
+#define SCROLL_DIVIDER 40
+
+uint16_t current_cpi = PMW33XX_CPI;
+static uint16_t saved_cpi = 0;
 
 // --------------------------------------------------------------------------
 // KEYMAP
@@ -60,6 +71,13 @@ oled_rotation_t oled_init_user(oled_rotation_t rotation) {
     return OLED_ROTATION_270;
 }
 
+static bool is_drag_scroll = false;
+static bool is_sniping = false;
+
+void pointing_device_drag_scroll_event(bool scroll_active) {
+    is_drag_scroll = scroll_active;
+}
+
 bool oled_task_user(void) {
     // -------------------------------------------------------
     // Vertical Layout (32 pixels wide x 128 pixels tall)
@@ -75,31 +93,120 @@ bool oled_task_user(void) {
             oled_write_P(PSTR("BASE\n"), false);
             break;
         case _LOWER:
-            oled_write_P(PSTR("LOWER\n"), true);
+            oled_write_P(PSTR("LWR\n"), true);
             break;
         default:
             oled_write_P(PSTR("????\n"), false);
     }
-	
-	
-    
-    oled_write_P(PSTR("\n"), false);
+	oled_write_P(PSTR("\n---\n"), false);
+	oled_write_P(PSTR("MOUSE\n"), false); 	
+	oled_write_P(PSTR("---\n"), false);
+		
+	oled_write_P(PSTR("DPI: "), false);
+    uint16_t cpi = current_cpi;
+    char cpi_str[6];
+    sprintf(cpi_str, "%u", cpi);
+    oled_write(cpi_str, false);
 
-    // Modifiers (Compact Vertical Stack)
-    uint8_t mods = get_mods();
+    oled_write_P(PSTR("\n\n"), false);
+   
 
-    // C = Ctrl, S = Shift, A = Alt, G = GUI
-    if (mods & MOD_MASK_CTRL)  oled_write_P(PSTR("CTRL\n"), true);
-    else                       oled_write_P(PSTR("CTRL\n"), false);
-
-    if (mods & MOD_MASK_SHIFT) oled_write_P(PSTR("SHIFT\n"), true);
-    else                       oled_write_P(PSTR("SHIFT\n"), false);
-
-    if (mods & MOD_MASK_ALT)   oled_write_P(PSTR("ALT\n"), true);
-    else                       oled_write_P(PSTR("ALT\n"), false);
-    
-    if (mods & MOD_MASK_GUI)   oled_write_P(PSTR("WIN\n"), true);
-    else                       oled_write_P(PSTR("WIN\n"), false);
+    if (is_drag_scroll) {
+       oled_write_P(PSTR("SCRL"), true);
+    } else {
+       oled_write_P(PSTR("SCRL"), false);
+    }
+	oled_write_P(PSTR("\n"), false);
+	if (is_sniping) {
+       oled_write_P(PSTR("SNIP"), true);
+    } else {
+       oled_write_P(PSTR("SNIP"), false);
+    }
 
     return false;
+}
+
+// 2. The Key Processing Logic
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    switch (keycode) {
+        case KEY_DRAG_SCROLL:
+            // When key is held, turn scroll flag ON. When released, OFF.
+            if (record->event.pressed) {
+                is_drag_scroll = true;
+                // Optional: Update OLED listener if you use it
+                pointing_device_drag_scroll_event(true); 
+            } else {
+                is_drag_scroll = false;
+                pointing_device_drag_scroll_event(false);
+            }
+            return false;
+
+        case KEY_DPI_UP:
+            if (record->event.pressed) {
+                // Increase by 400. Cap at 3200.
+                if (current_cpi < 3200) {
+                    current_cpi += 400;
+                }
+                pointing_device_set_cpi(current_cpi);
+            }
+            return false;
+
+        // --- NEW DPI DOWN LOGIC ---
+        case KEY_DPI_DOWN:
+            if (record->event.pressed) {
+                // Decrease by 400. Cap at 200.
+                if (current_cpi > 400) {
+                    current_cpi -= 400;
+                }
+                pointing_device_set_cpi(current_cpi);
+            }
+            return false;
+			
+		case KEY_SNIPING:
+            if (record->event.pressed) {
+                // 1. Save the current normal speed
+                saved_cpi = current_cpi;
+                // 2. Set sensor to Low Speed (e.g. 200)
+                pointing_device_set_cpi(200);
+				
+				is_sniping = true;
+            } else {
+                // 1. Restore the normal speed
+                if (saved_cpi > 0) { // Safety check
+                    pointing_device_set_cpi(saved_cpi);
+                    saved_cpi = 0; // Reset flag
+                }
+				else {
+					pointing_device_set_cpi(800);
+				}
+				
+				is_sniping = false;
+            }
+            return false;
+    }
+    return true;
+}
+
+report_mouse_t pointing_device_task_user(report_mouse_t mouse_report) {
+    if (is_drag_scroll) {
+        static int16_t scroll_h_accum = 0;
+        static int16_t scroll_v_accum = 0;
+        
+        scroll_h_accum += mouse_report.x;
+        scroll_v_accum += mouse_report.y;
+
+        // INVERT HORIZONTAL (Optional - remove the minus if you like it normal)
+        mouse_report.h = -(scroll_h_accum / SCROLL_DIVIDER);
+
+        // INVERT VERTICAL (This creates "Natural Scrolling")
+        mouse_report.v = -(scroll_v_accum / SCROLL_DIVIDER);
+        
+        // Keep the remainder for smoothness
+        scroll_h_accum %= SCROLL_DIVIDER;
+        scroll_v_accum %= SCROLL_DIVIDER;
+        
+        mouse_report.x = 0;
+        mouse_report.y = 0;
+    }
+    return mouse_report;
 }

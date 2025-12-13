@@ -57,5 +57,11 @@
           "10,1" 
       ]
     ]
-  }
+  },
+  "customKeycodes": [
+    { "name": "0x7E00", "title": "Drag Scroll (Hold)", "shortName": "Scrl" },
+    { "name": "0x7E01", "title": "DPI Up", "shortName": "DPI+" },
+    { "name": "0x7E02", "title": "DPI Down", "shortName": "DPI-" },
+    { "name": "0x7E03", "title": "Sniping (Hold)", "shortName": "Snip" }
+  ]
 }
